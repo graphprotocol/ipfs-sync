@@ -9,8 +9,8 @@ RUN git clone https://github.com/graphprotocol/ipfs-sync \
     && cd ipfs-sync \
     && git checkout "$SOURCE_BRANCH" \
     && yarn --pure-lockfile \
-    && npm install -g --verbose -unsafe-perm
-    # && cd .. \
-    # && rm -rf ipfs-sync
+    && npm install -g --verbose -unsafe-perm \
+    && cd .. \
+    && rm -rf ipfs-sync
 
 ENTRYPOINT ["/usr/local/bin/ipfs-sync"]
