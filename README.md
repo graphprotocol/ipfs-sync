@@ -11,5 +11,5 @@ npm install -g @graphprotocol/ipfs-sync
 ## Usage
 
 ```sh
-ipfs-sync sync-files --from <URL> --to <URL>
+ipfs-sync sync-files --from <URL> --to <URL> [--skip-existing]
 ```
