@@ -16,6 +16,7 @@
   "dependencies": {
     "batch-promises": "^0.0.3",
     "chalk": "^2.4.2",
+    "form-data": "^2.5.1",
     "gluegun": "^3.3.4",
     "ipfs-http-client": "^37.0.2"
   },
