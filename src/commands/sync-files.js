@@ -2,6 +2,23 @@ const chalk = require('chalk')
 const ipfs = require('../ipfs')
 const batchPromises = require('batch-promises')
 
+const collectUnsyncedFiles = async ({ fromClient, toClient, skipExisting }) => {
+  let fromPinnedFiles = await fromClient.pin.ls()
+
+  // If --skip-existing is provided, we obtain a list of all pinned files from
+  // the target node. If not, we assume none of the source files exist on the
+  // target node yet.
+  if (skipExisting) {
+    let toPinnedFiles = await toClient.pin.ls()
+    return fromPinnedFiles.filter(
+      sourceFile =>
+        !toPinnedFiles.find(targetFile => sourceFile.hash === targetFile.hash),
+    )
+  } else {
+    return fromPinnedFiles
+  }
+}
+
 const HELP = `
 ${chalk.bold('ipfs-sync sync-files')} [options]
 
@@ -9,6 +26,7 @@ ${chalk.dim('Options:')}
   -h, --help                    Show usage information
   --from <URL>                  Source IPFS node
   --to <URL>                    Target IPFS node
+  --skip-existing               Skip files that already exist on the target IPFS node
 `
 
 module.exports = {
@@ -17,7 +35,7 @@ module.exports = {
     let { print } = toolbox
 
     // Parse CLI parameters
-    let { h, help, from, to } = toolbox.parameters.options
+    let { h, help, from, to, skipExisting } = toolbox.parameters.options
 
     // Show help text if asked for
     if (h || help) {
@@ -31,33 +49,29 @@ module.exports = {
       return
     }
 
+    print.info(`Syncing files`)
+    print.info(`Source node (--from): ${from}`)
+    print.info(`Target node (--to): ${to}`)
+
     let fromClient = ipfs.createIpfsClient(from)
     let toClient = ipfs.createIpfsClient(to)
 
     // Obtain a list of all pinned files from both nodes
-    let fromPinnedFiles = await fromClient.pin.ls()
-    let toPinnedFiles = await toClient.pin.ls()
+    let unsyncedFiles = await collectUnsyncedFiles({
+      fromClient,
+      toClient,
+      skipExisting,
+    })
 
-    print.info(`Syncing files`)
-    print.info(`Source node (--from): ${from}`)
-    print.info(`Target node (--to): ${to}`)
-    print.info(`${fromPinnedFiles.length} files on the source node`)
-    print.info(`${toPinnedFiles.length} files on the target node`)
-
-    let unsyncedFiles = fromPinnedFiles.filter(
-      sourceFile =>
-        !toPinnedFiles.find(targetFile => sourceFile.hash === targetFile.hash),
-    )
+    print.info(`${unsyncedFiles.length} files need to be synced`)
+    print.info(`---`)
 
     let syncResult = {
       syncedFiles: [],
       skippedDirectories: [],
     }
 
-    print.info(`${unsyncedFiles.length} files need to be synced`)
-    print.info(`---`)
-
-    let result = await batchPromises(
+    await batchPromises(
       // Sync in batches of 10 files
       10,
       // Inject file indices
