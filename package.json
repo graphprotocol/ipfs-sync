@@ -1,6 +1,6 @@
 {
   "name": "@graphprotocol/ipfs-sync",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "Graph Protocol, Inc.",
   "description": "Script to sync files from one IPFS node to another",
   "homepage": "https://github.com/graphprotocol/ipfs-sync#readme",
