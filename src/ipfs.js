@@ -6,11 +6,9 @@ const createIpfsClient = node => {
   try {
     url = new URL(node)
   } catch (e) {
-    toolbox.print.error(`\
-Invalid IPFS URL: ${node}
+    throw new Error(`Invalid IPFS URL: ${node}
 
 The URL must be of the following format: http(s)://host[:port]/[path]`)
-    return undefined
   }
 
   // Connect to the IPFS node (if a node address was provided)
