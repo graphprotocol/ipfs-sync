@@ -8,7 +8,7 @@ ENV SOURCE_BRANCH "master"
 RUN git clone https://github.com/graphprotocol/ipfs-sync \
     && cd ipfs-sync \
     && git checkout "$SOURCE_BRANCH" \
-    && yarn --pure-lockfile \
+    && npm install \
     && npm install -g --verbose -unsafe-perm
 
 ENTRYPOINT ["/usr/local/bin/ipfs-sync"]
