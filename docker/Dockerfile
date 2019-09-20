@@ -23,7 +23,7 @@ RUN git clone https://github.com/graphprotocol/ipfs-sync \
     && cd .. \
     && rm -rf ipfs-sync
 
-ENV IPFS_FROM
-ENV IPFS_TO
+ENV IPFS_FROM ""
+ENV IPFS_TO ""
 
 CMD ["sh", "-c", "ipfs-sync --from '${IPFS_FROM}' --to '${IPFS_TO}'""]
