@@ -12,19 +12,19 @@ The URL must be of the following format: http(s)://host[:port]/[path]`)
   }
 
   // Set the port to 443 or 80 explicitly, if no port was provided
-  if (!url.port) {
-    if (url.protocol === 'https:') {
-      url.port = 443
-    } else if (url.protocol === 'http:') {
-      url.port = 80
-    }
-  }
+  let port = url.port
+    ? url.port
+    : url.protocol === 'https:'
+    ? 443
+    : url.protocol === 'http'
+    ? 80
+    : undefined
 
   // Connect to the IPFS node (if a node address was provided)
   return ipfsHttpClient({
     protocol: url.protocol.replace(/[:]+$/, ''),
     host: url.hostname,
-    port: url.port,
+    port: port,
     'api-path': url.pathname.replace(/\/$/, '') + '/api/v0/',
   })
 }
