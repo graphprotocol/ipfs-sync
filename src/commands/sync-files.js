@@ -64,10 +64,13 @@ module.exports = {
     })
 
     print.info(`${unsyncedFiles.length} files need to be synced`)
-    print.info(`---`)
+    if (unsyncedFiles.length > 0) {
+      print.info(`---`)
+    }
 
     let syncResult = {
       syncedFiles: [],
+      failedFiles: [],
       skippedDirectories: [],
     }
 
@@ -95,10 +98,11 @@ module.exports = {
           if (e.message.match('dag node is a directory')) {
             print.info(`${label}: Skipping file: File is a directory`)
             syncResult.skippedDirectories.push(sourceFile.hash)
-            return
           } else {
-            throw new Error(`${label}: Failed to retrieve file: ${e.message}`)
+            print.warning(`${label}: Failed to retrieve file: ${e.message}`)
+            syncResult.failedFiles.push(sourceFile.hash)
           }
+          return
         }
 
         // Upload file
@@ -125,5 +129,10 @@ module.exports = {
     print.info(`---`)
     print.info(`${syncResult.syncedFiles.length}/${unsyncedFiles.length} files synced`)
     print.info(`${syncResult.skippedDirectories.length} skipped (directories)`)
+    print.info(`${syncResult.failedFiles.length} failed`)
+
+    if (syncResult.failedFiles.length > 0) {
+      process.exitCode = 1
+    }
   },
 }
