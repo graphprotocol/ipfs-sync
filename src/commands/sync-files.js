@@ -1,9 +1,10 @@
+const fs = require('fs')
 const chalk = require('chalk')
 const ipfs = require('../ipfs')
 const batchPromises = require('batch-promises')
 
-const collectUnsyncedFiles = async ({ fromClient, toClient, skipExisting }) => {
-  let fromPinnedFiles = await fromClient.pin.ls()
+const collectUnsyncedFiles = async ({ fromClient, toClient, skipExisting, fileList }) => {
+  let fromPinnedFiles = fileList ? fileList : await fromClient.pin.ls()
 
   // If --skip-existing is provided, we obtain a list of all pinned files from
   // the target node. If not, we assume none of the source files exist on the
@@ -26,6 +27,7 @@ ${chalk.dim('Options:')}
   -h, --help                    Show usage information
   --from <URL>                  Source IPFS node
   --to <URL>                    Target IPFS node
+  --file-list <FILE>            File with one IPFS hash to sync per line
   --skip-existing               Skip files that already exist on the target IPFS node
 `
 
@@ -35,7 +37,7 @@ module.exports = {
     let { print } = toolbox
 
     // Parse CLI parameters
-    let { h, help, from, to, skipExisting } = toolbox.parameters.options
+    let { h, help, from, to, skipExisting, fileList } = toolbox.parameters.options
 
     // Show help text if asked for
     if (h || help) {
@@ -56,10 +58,20 @@ module.exports = {
     let fromClient = ipfs.createIpfsClient(from)
     let toClient = ipfs.createIpfsClient(to)
 
+    // Read file list from the `--list` file
+    fileList = fileList
+      ? fs
+          .readFileSync(fileList, 'utf-8')
+          .trim()
+          .split('\n')
+          .map(hash => ({ hash }))
+      : undefined
+
     // Obtain a list of all pinned files from both nodes
     let unsyncedFiles = await collectUnsyncedFiles({
       fromClient,
       toClient,
+      fileList,
       skipExisting,
     })
 
