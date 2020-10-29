@@ -1,5 +1,4 @@
 const ipfsHttpClient = require('ipfs-http-client')
-const toolbox = require('gluegun/toolbox')
 
 const createIpfsClient = node => {
   let url

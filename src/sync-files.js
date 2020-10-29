@@ -1,6 +1,4 @@
-const fs = require('fs')
-const chalk = require('chalk')
-const ipfs = require('../ipfs')
+const ipfs = require('./ipfs')
 const batchPromises = require('batch-promises')
 
 const collectUnsyncedFiles = async ({ fromClient, toClient, skipExisting, fileList }) => {
@@ -20,52 +18,21 @@ const collectUnsyncedFiles = async ({ fromClient, toClient, skipExisting, fileLi
   }
 }
 
-const HELP = `
-${chalk.bold('ipfs-sync sync-files')} [options]
-
-${chalk.dim('Options:')}
-  -h, --help                    Show usage information
-  --from <URL>                  Source IPFS node
-  --to <URL>                    Target IPFS node
-  --file-list <FILE>            File with one IPFS hash to sync per line
-  --skip-existing               Skip files that already exist on the target IPFS node
-`
-
-module.exports = {
-  description: 'Syncs files from one IPFS node to another',
-  run: async toolbox => {
-    let { print } = toolbox
+module.exports = async props => {
 
     // Parse CLI parameters
-    let { h, help, from, to, skipExisting, fileList } = toolbox.parameters.options
-
-    // Show help text if asked for
-    if (h || help) {
-      print.info(HELP)
-      return
-    }
+    let { from, to, skipExisting, fileList } = props
 
     if (!from || !to) {
-      print.info(HELP)
-      process.exitCode = 1
       return
     }
 
-    print.info(`Syncing files`)
-    print.info(`Source node (--from): ${from}`)
-    print.info(`Target node (--to): ${to}`)
+  console.info(`Syncing files`)
+  console.info(`Source node (--from): ${from}`)
+  console.info(`Target node (--to): ${to}`)
 
     let fromClient = ipfs.createIpfsClient(from)
     let toClient = ipfs.createIpfsClient(to)
-
-    // Read file list from the `--list` file
-    fileList = fileList
-      ? fs
-          .readFileSync(fileList, 'utf-8')
-          .trim()
-          .split('\n')
-          .map(hash => ({ hash }))
-      : undefined
 
     // Obtain a list of all pinned files from both nodes
     let unsyncedFiles = await collectUnsyncedFiles({
@@ -75,10 +42,7 @@ module.exports = {
       skipExisting,
     })
 
-    print.info(`${unsyncedFiles.length} files need to be synced`)
-    if (unsyncedFiles.length > 0) {
-      print.info(`---`)
-    }
+  console.info(`${unsyncedFiles.length} files need to be synced`)
 
     let syncResult = {
       syncedFiles: [],
@@ -99,26 +63,26 @@ module.exports = {
         let totalFiles = unsyncedFiles.length
         let label = `${sourceFile.index}/${totalFiles} (${sourceFile.hash})`
 
-        print.info(`${label}: Syncing`)
+        console.info(`${label}: Syncing`)
 
         // Download file
-        print.info(`${label}: Retrieving file`)
+        console.info(`${label}: Retrieving file`)
         let data
         try {
           data = await fromClient.cat(sourceFile.hash)
         } catch (e) {
           if (e.message.match('dag node is a directory')) {
-            print.info(`${label}: Skipping file: File is a directory`)
+            console.info(`${label}: Skipping file: File is a directory`)
             syncResult.skippedDirectories.push(sourceFile.hash)
           } else {
-            print.warning(`${label}: Failed to retrieve file: ${e.message}`)
+            console.warn(`${label}: Failed to retrieve file: ${e.message}`)
             syncResult.failedFiles.push(sourceFile.hash)
           }
           return
         }
 
         // Upload file
-        print.info(`${label}: Uploading file`)
+        console.info(`${label}: Uploading file`)
         let targetFile
         try {
           targetFile = await toClient.add(data)
@@ -128,7 +92,7 @@ module.exports = {
 
         // Verify integrity before and after
         if (sourceFile.hash === targetFile[0].hash) {
-          print.info(`${label}: File synced successfully`)
+          console.info(`${label}: File synced successfully`)
           syncResult.syncedFiles.push(sourceFile.hash)
         } else {
           throw new Error(
@@ -138,13 +102,10 @@ module.exports = {
       },
     )
 
-    print.info(`---`)
-    print.info(`${syncResult.syncedFiles.length}/${unsyncedFiles.length} files synced`)
-    print.info(`${syncResult.skippedDirectories.length} skipped (directories)`)
-    print.info(`${syncResult.failedFiles.length} failed`)
+    console.info(`---`)
+    console.info(`${syncResult.syncedFiles.length}/${unsyncedFiles.length} files synced`)
+    console.info(`${syncResult.skippedDirectories.length} skipped (directories)`)
+    console.info(`${syncResult.failedFiles.length} failed`)
 
-    if (syncResult.failedFiles.length > 0) {
-      process.exitCode = 1
-    }
-  },
+    return syncResult;
 }
