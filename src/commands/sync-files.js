@@ -3,6 +3,10 @@ const chalk = require('chalk')
 const ipfs = require('../ipfs')
 const batchPromises = require('batch-promises')
 
+const DEFAULT_RETRIES = 1;
+const DEFAULT_RETRY_WAIT_MS = 1000;
+
+
 const collectUnsyncedFiles = async ({ fromClient, toClient, skipExisting, fileList }) => {
   let fromPinnedFiles = fileList ? fileList : await fromClient.pin.ls()
 
@@ -20,6 +24,34 @@ const collectUnsyncedFiles = async ({ fromClient, toClient, skipExisting, fileLi
   }
 }
 
+
+const syncWait = (ms) => {
+  return new Promise((resolve, _reject) => {
+    setTimeout(() => {
+      resolve(ms)
+    }, ms)
+  })
+}
+
+const fetchData = async ({ print, fromClient, sourceFile, label, syncResult, retries, retryWait }) => {
+  try {
+    return await fromClient.cat(sourceFile.hash)
+  } catch (e) {
+    if (e.message.match('dag node is a directory')) {
+      print.info(`${label}: Skipping file: File is a directory`)
+      syncResult.skippedDirectories.push(sourceFile.hash)
+    } else if (retries > 0) {
+      print.info(`${label}: Failed to retrieve file: Retrying...`)
+      await syncWait(retryWait || DEFAULT_RETRY_WAIT_MS)
+      return await fetchData({ print, fromClient, sourceFile, label, syncResult, retries: retries - 1, retryWait })
+    } else {
+      print.warning(`${label}: Failed to retrieve file: ${e.message}`)
+      syncResult.failedFiles.push(sourceFile.hash)
+      throw new Error("Max retries reached.")
+    }
+  }
+}
+
 const HELP = `
 ${chalk.bold('ipfs-sync sync-files')} [options]
 
@@ -29,6 +61,10 @@ ${chalk.dim('Options:')}
   --to <URL>                    Target IPFS node
   --file-list <FILE>            File with one IPFS hash to sync per line
   --skip-existing               Skip files that already exist on the target IPFS node
+  --retries <NUMBER>            Number of times to try to download a file from Source IPFS node
+                                Set to 1 by default
+  --retry-wait <MILLISECONDS>   Time to wait before attempting to download a file again
+                                Set to 1000 by default
 `
 
 module.exports = {
@@ -37,7 +73,7 @@ module.exports = {
     let { print } = toolbox
 
     // Parse CLI parameters
-    let { h, help, from, to, skipExisting, fileList } = toolbox.parameters.options
+    let { h, help, from, to, skipExisting, fileList, retries, retryWait } = toolbox.parameters.options
 
     // Show help text if asked for
     if (h || help) {
@@ -54,6 +90,7 @@ module.exports = {
     print.info(`Syncing files`)
     print.info(`Source node (--from): ${from}`)
     print.info(`Target node (--to): ${to}`)
+    print.info(`Retries: ${retries || DEFAULT_RETRIES} `)
 
     let fromClient = ipfs.createIpfsClient(from)
     let toClient = ipfs.createIpfsClient(to)
@@ -105,15 +142,9 @@ module.exports = {
         print.info(`${label}: Retrieving file`)
         let data
         try {
-          data = await fromClient.cat(sourceFile.hash)
+          data = await fetchData({print, fromClient, sourceFile, label, syncResult, retries, retryWait})
         } catch (e) {
-          if (e.message.match('dag node is a directory')) {
-            print.info(`${label}: Skipping file: File is a directory`)
-            syncResult.skippedDirectories.push(sourceFile.hash)
-          } else {
-            print.warning(`${label}: Failed to retrieve file: ${e.message}`)
-            syncResult.failedFiles.push(sourceFile.hash)
-          }
+          print.warning(`${label}: Failed to retrieve file: ${e.message}`)
           return
         }
 
