@@ -18,7 +18,7 @@
     "chalk": "^2.4.2",
     "form-data": "^2.5.1",
     "gluegun": "^3.3.4",
-    "ipfs-http-client": "^37.0.2"
+    "ipfs-http-client": "^51.0.1"
   },
   "devDependencies": {
     "prettier": "^1.18.2"
