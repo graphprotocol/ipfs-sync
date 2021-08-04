@@ -1,23 +1,32 @@
 const fs = require('fs')
 const chalk = require('chalk')
 const ipfs = require('../ipfs')
-const batchPromises = require('batch-promises')
+const batchPromises = require('batch-promises');
+const { CID } = require('ipfs-http-client');
 
 const DEFAULT_RETRIES = 1;
 const DEFAULT_RETRY_WAIT_MS = 1000;
 
 
+const asyncIteratorToList = async (iterator) => {
+  const values = []
+  for await (const value of iterator()) {
+    values.push(value)
+  }
+  return values
+}
+
 const collectUnsyncedFiles = async ({ fromClient, toClient, skipExisting, fileList }) => {
-  let fromPinnedFiles = fileList ? fileList : await fromClient.pin.ls()
+  let fromPinnedFiles = fileList ? fileList : await asyncIteratorToList(fromClient.pin.ls)
 
   // If --skip-existing is provided, we obtain a list of all pinned files from
   // the target node. If not, we assume none of the source files exist on the
   // target node yet.
   if (skipExisting) {
-    let toPinnedFiles = await toClient.pin.ls()
+    let toPinnedFiles = await asyncIteratorToList(toClient.pin.ls)
     return fromPinnedFiles.filter(
       sourceFile =>
-        !toPinnedFiles.find(targetFile => sourceFile.hash === targetFile.hash),
+        !toPinnedFiles.find(targetFile => sourceFile.cid.equals(targetFile.cid)),
     )
   } else {
     return fromPinnedFiles
@@ -35,18 +44,18 @@ const syncWait = (ms) => {
 
 const fetchData = async ({ print, fromClient, sourceFile, label, syncResult, retries, retryWait }) => {
   try {
-    return await fromClient.cat(sourceFile.hash)
+    return await fromClient.cat(sourceFile.cid)
   } catch (e) {
     if (e.message.match('dag node is a directory')) {
       print.info(`${label}: Skipping file: File is a directory`)
-      syncResult.skippedDirectories.push(sourceFile.hash)
+      syncResult.skippedDirectories.push(sourceFile.cid)
     } else if (retries > 0) {
       print.info(`${label}: Failed to retrieve file: Retrying...`)
       await syncWait(retryWait || DEFAULT_RETRY_WAIT_MS)
       return await fetchData({ print, fromClient, sourceFile, label, syncResult, retries: retries - 1, retryWait })
     } else {
       print.warning(`${label}: Failed to retrieve file: ${e.message}`)
-      syncResult.failedFiles.push(sourceFile.hash)
+      syncResult.failedFiles.push(sourceFile.cid)
       throw new Error("Max retries reached.")
     }
   }
@@ -59,7 +68,7 @@ ${chalk.dim('Options:')}
   -h, --help                    Show usage information
   --from <URL>                  Source IPFS node
   --to <URL>                    Target IPFS node
-  --file-list <FILE>            File with one IPFS hash to sync per line
+  --file-list <FILE>            File with one IPFS cid to sync per line
   --skip-existing               Skip files that already exist on the target IPFS node
   --retries <NUMBER>            Number of times to try to download a file from Source IPFS node
                                 Set to 1 by default
@@ -101,7 +110,7 @@ module.exports = {
           .readFileSync(fileList, 'utf-8')
           .trim()
           .split('\n')
-          .map(hash => ({ hash }))
+          .map(cid => ({ cid: CID.parse(cid) }))
       : undefined
 
     // Obtain a list of all pinned files from both nodes
@@ -134,7 +143,7 @@ module.exports = {
       // Upload promise
       async sourceFile => {
         let totalFiles = unsyncedFiles.length
-        let label = `${sourceFile.index}/${totalFiles} (${sourceFile.hash})`
+        let label = `${sourceFile.index}/${totalFiles} (${sourceFile.cid})`
 
         print.info(`${label}: Syncing`)
 
@@ -158,12 +167,12 @@ module.exports = {
         }
 
         // Verify integrity before and after
-        if (sourceFile.hash === targetFile[0].hash) {
+        if (sourceFile.cid.equals(targetFile.cid)) {
           print.info(`${label}: File synced successfully`)
-          syncResult.syncedFiles.push(sourceFile.hash)
+          syncResult.syncedFiles.push(sourceFile.cid)
         } else {
           throw new Error(
-            `${label}: Failed to sync file: Uploaded file hash differs: ${targetFile[0].hash}`,
+            `${label}: Failed to sync file: Uploaded file cid differs: ${targetFile.cid}`,
           )
         }
       },

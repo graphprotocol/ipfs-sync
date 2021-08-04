@@ -1,4 +1,4 @@
-const ipfsHttpClient = require('ipfs-http-client')
+const { create } = require('ipfs-http-client')
 const toolbox = require('gluegun/toolbox')
 
 const createIpfsClient = node => {
@@ -21,11 +21,11 @@ The URL must be of the following format: http(s)://host[:port]/[path]`)
     : undefined
 
   // Connect to the IPFS node (if a node address was provided)
-  return ipfsHttpClient({
+  return create({
     protocol: url.protocol.replace(/[:]+$/, ''),
     host: url.hostname,
     port: port,
-    'api-path': url.pathname.replace(/\/$/, '') + '/api/v0/',
+    path: url.pathname.replace(/\/$/, '') + '/api/v0/',
   })
 }
 
