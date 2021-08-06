@@ -17,13 +17,13 @@ const asyncIteratorToList = async (iterator) => {
 }
 
 const collectUnsyncedFiles = async ({ fromClient, toClient, skipExisting, fileList }) => {
-  let fromPinnedFiles = fileList ? fileList : await asyncIteratorToList(fromClient.pin.remote.ls)
+  let fromPinnedFiles = fileList ? fileList : await asyncIteratorToList(fromClient.pin.ls)
 
   // If --skip-existing is provided, we obtain a list of all pinned files from
   // the target node. If not, we assume none of the source files exist on the
   // target node yet.
   if (skipExisting) {
-    let toPinnedFiles = await asyncIteratorToList(toClient.pin.remote.ls)
+    let toPinnedFiles = await asyncIteratorToList(toClient.pin.ls)
     return fromPinnedFiles.filter(
       sourceFile =>
         !toPinnedFiles.find(targetFile => sourceFile.cid.equals(targetFile.cid)),
