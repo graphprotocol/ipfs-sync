@@ -167,7 +167,14 @@ module.exports = {
           try {
             targetFile = await toClient.add(data)
           } catch (e) {
-            throw new Error(`${label}: Failed to upload file: ${e.message}`)
+            if (e.message.match('this dag node is a directory')) {
+              print.info(`${label}: Skipping file: File is a directory`)
+              syncResult.skippedDirectories.push(sourceFile.cid)
+              return
+            }
+            print.error(`${label}: Failed to upload file: ${e.message}`)
+            syncResult.failedFiles.push(sourceFile.cid)
+            return
           }
   
           // Verify integrity before and after
