@@ -4,7 +4,6 @@ const ipfs = require('../ipfs')
 const batchPromises = require('batch-promises');
 const { CID } = require('ipfs-http-client');
 
-const DEFAULT_RETRIES = 1;
 const DEFAULT_RETRY_WAIT_MS = 1000;
 
 
@@ -42,11 +41,13 @@ const syncWait = (ms) => {
   })
 }
 
-const fetchData = async ({ print, fromClient, sourceFile, label, syncResult, retries, retryWait }) => {
+const fetchData = async ({ print, fromClient, sourceFile, label, syncResult, retries, retryWait}) => {
+  let file
   try {
-    return await fromClient.cat(sourceFile.cid)
+    print.info(`${sourceFile.cid}...`)
+    file = await fromClient.cat(sourceFile.cid)
   } catch (e) {
-    if (e.message.match('dag node is a directory')) {
+    if (e.message.match('this dag node is a directory')) {
       print.info(`${label}: Skipping file: File is a directory`)
       syncResult.skippedDirectories.push(sourceFile.cid)
     } else if (retries > 0) {
@@ -59,6 +60,8 @@ const fetchData = async ({ print, fromClient, sourceFile, label, syncResult, ret
       throw new Error("Max retries reached.")
     }
   }
+
+  return file
 }
 
 const HELP = `
@@ -96,18 +99,18 @@ module.exports = {
       return
     }
 
-    targets = to.split(',')
+    let targets = to.split(',')
     let fromClient = ipfs.createIpfsClient(from)
 
     for (const [index, target] of targets.entries()) {
       print.info(`Syncing files`)
       print.info(`Source node (--from): ${from}`)
-      targets.length > 1 ? 
+      targets.length > 1 ?
         print.info(`Target node (--to) [${index + 1}/${targets.length}]: ${target}`) :
         print.info(`Target node (--to): ${target}`)
-  
+
       let toClient = ipfs.createIpfsClient(target)
-  
+
       // Read file list from the `--list` file
       fileList = fileListPath
         ? fs
@@ -116,7 +119,7 @@ module.exports = {
             .split('\n')
             .map(cid => ({ cid: CID.parse(cid) }))
         : undefined
-  
+
       // Obtain a list of all pinned files from both nodes
       let unsyncedFiles = await collectUnsyncedFiles({
         fromClient,
@@ -124,18 +127,18 @@ module.exports = {
         fileList,
         skipExisting,
       })
-  
+
       print.info(`${unsyncedFiles.length} files need to be synced`)
       if (unsyncedFiles.length > 0) {
         print.info(`---`)
       }
-  
+
       let syncResult = {
         syncedFiles: [],
         failedFiles: [],
         skippedDirectories: [],
       }
-  
+
       await batchPromises(
         // Sync in batches of 10 files
         10,
@@ -146,50 +149,62 @@ module.exports = {
         }),
         // Upload promise
         async sourceFile => {
+          let cidV = 1
+          if ((`${sourceFile.cid}`).startsWith('Qm')) {
+            cidV = 0
+          }
+
           let totalFiles = unsyncedFiles.length
           let label = `${sourceFile.index}/${totalFiles} (${sourceFile.cid})`
-  
+
           print.info(`${label}: Syncing`)
-  
+
           // Download file
           print.info(`${label}: Retrieving file`)
           let data
           try {
             data = await fetchData({print, fromClient, sourceFile, label, syncResult, retries, retryWait})
           } catch (e) {
-            print.warning(`${label}: Failed to retrieve file: ${e.message}`)
+            print.warning(`${label}: Failed to retrieve file: ${e}`)
             return
           }
-  
+
           // Upload file
           print.info(`${label}: Uploading file`)
+
           let targetFile
           try {
-            targetFile = await toClient.add(data)
+            targetFile = await toClient.add(data, {cidVersion:cidV})
           } catch (e) {
-            throw new Error(`${label}: Failed to upload file: ${e.message}`)
+            if (e.message.match('expected a file argument')) {
+              print.info(`${label}: Skipped this file because it's a directory`)
+              syncResult.skippedDirectories.push(sourceFile.cid)
+              return
+            } else {
+              throw new Error(`${label}: Failed to upload file: ${e.message}`)
+            }
           }
-  
+
           // Verify integrity before and after
           if (sourceFile.cid.equals(targetFile.cid)) {
-            print.info(`${label}: File synced successfully`)
+            print.info(`${label}: File synced successfully.`)
             syncResult.syncedFiles.push(sourceFile.cid)
           } else {
             throw new Error(
-              `${label}: Failed to sync file: Uploaded file cid differs: ${targetFile.cid}`,
+              `${label}, version: ${cidV}: Failed to sync file: Uploaded file cid differs: ${targetFile.cid}`,
             )
           }
         },
       )
-  
+
       print.info(`---`)
       print.info(`${syncResult.syncedFiles.length}/${unsyncedFiles.length} files synced`)
       print.info(`${syncResult.skippedDirectories.length} skipped (directories)`)
       print.info(`${syncResult.failedFiles.length} failed`)
-  
+
       if (syncResult.failedFiles.length > 0) {
         process.exitCode = 1
       }
-    } 
+    }
   },
 }
