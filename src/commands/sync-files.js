@@ -177,7 +177,7 @@ module.exports = {
             targetFile = await toClient.add(data, {cidVersion:cidV})
           } catch (e) {
             if (e.message.match('expected a file argument')) {
-              print.info(`${label}: This file is a directory`)
+              print.info(`${label}: Skipped this file because it's a directory`)
               syncResult.skippedDirectories.push(sourceFile.cid)
               return
             } else {
@@ -187,7 +187,7 @@ module.exports = {
 
           // Verify integrity before and after
           if (sourceFile.cid.equals(targetFile.cid)) {
-            print.info(`${label}: File synced successfully`)
+            print.info(`${label}: File synced successfully.`)
             syncResult.syncedFiles.push(sourceFile.cid)
           } else {
             throw new Error(
