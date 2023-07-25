@@ -3,7 +3,6 @@ const chalk = require('chalk')
 const ipfs = require('../ipfs')
 const batchPromises = require('batch-promises');
 const { CID } = require('ipfs-http-client');
-const { Duplex } = require('stream');
 
 const DEFAULT_RETRY_WAIT_MS = 1000;
 
@@ -43,18 +42,11 @@ const syncWait = (ms) => {
 }
 
 const fetchData = async ({ print, fromClient, sourceFile, label, syncResult, retries, retryWait}) => {
-<<<<<<< HEAD
   let file
-=======
->>>>>>> 16e5473 (added Duplex option for ipfs sync)
   try {
-    print.info(`${sourceFile.cid}...`)
     file = await fromClient.cat(sourceFile.cid)
   } catch (e) {
-    if (e.message.match('this dag node is a directory')) {
-      print.info(`${label}: Skipping file: File is a directory`)
-      syncResult.skippedDirectories.push(sourceFile.cid)
-    } else if (retries > 0) {
+    if (retries > 0) {
       print.info(`${label}: Failed to retrieve file: Retrying...`)
       await syncWait(retryWait || DEFAULT_RETRY_WAIT_MS)
       return await fetchData({ print, fromClient, sourceFile, label, syncResult, retries: retries - 1, retryWait })
@@ -181,11 +173,13 @@ module.exports = {
             targetFile = await toClient.add(data, {cidVersion:cidV})
           } catch (e) {
             if (e.message.match('expected a file argument')) {
-              print.info(`${label}: Skipped this file because it's a directory`)
+              print.info(`${label}: Skipping file: File is a directory`)
               syncResult.skippedDirectories.push(sourceFile.cid)
               return
             } else {
-              throw new Error(`${label}: Failed to upload file: ${e.message}`)
+              print.error(`${label}: Failed to upload file: ${e.message}`)
+              syncResult.failedFiles.push(sourceFile.cid)
+              return
             }
           }
 
