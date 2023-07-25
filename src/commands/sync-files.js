@@ -3,7 +3,6 @@ const chalk = require('chalk')
 const ipfs = require('../ipfs')
 const batchPromises = require('batch-promises');
 const { CID } = require('ipfs-http-client');
-const { Duplex } = require('stream');
 
 const DEFAULT_RETRY_WAIT_MS = 1000;
 
@@ -43,10 +42,7 @@ const syncWait = (ms) => {
 }
 
 const fetchData = async ({ print, fromClient, sourceFile, label, syncResult, retries, retryWait}) => {
-<<<<<<< HEAD
   let file
-=======
->>>>>>> 16e5473 (added Duplex option for ipfs sync)
   try {
     file = await fromClient.cat(sourceFile.cid)
   } catch (e) {
