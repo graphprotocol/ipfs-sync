@@ -1,4 +1,4 @@
-FROM node:18.15.0
+FROM node:18.12.1
 
 # Replace this with the graph-node branch you want to build the image from;
 # Note: Docker Hub substitutes this automatically using our hooks/post_checkout script.
