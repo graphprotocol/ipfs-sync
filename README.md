@@ -2,6 +2,8 @@
 
 Script to sync files from one IPFS node to another.
 
+## **DEPRECATED** This repository is deprecated now as the code was rewriten to golang and was renamed to accomodate more features related to IPFS. The new code is here [ipfs-mgm](https://github.com/graphprotocol/ipfs-mgm)
+
 ## Install
 
 ```sh
